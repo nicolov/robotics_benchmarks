@@ -1,0 +1,6 @@
+[submodule "vendor/eigen"]
+	path = vendor/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror.git
+[submodule "vendor/sltbench"]
+	path = vendor/sltbench
+	url = https://github.com/ivafanas/sltbench.git

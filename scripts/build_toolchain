@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euxo pipefail
+
+work_dir="/tmp/xt/${TRIPLE}"
+rm -rf "${work_dir}"
+mkdir -p "${work_dir}"
+cd "${work_dir}"
+
+# load example config
+ls /tmp/toolchain_configs
+cp "/tmp/toolchain_configs/${TRIPLE}.config" .config
+ct-ng oldconfig
+
+# build
+ct-ng build
+
+# clean up
+rm -rf "${work_dir}"

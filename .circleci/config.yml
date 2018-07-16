@@ -1,0 +1,92 @@
+references:
+  build-image: &build-image
+    nicolov/robotics-benchmarks:0.0.1
+
+version: 2.0
+
+jobs:
+  gcc-x86:
+    docker:
+      - image: *build-image
+    steps:
+      - checkout
+      - run: git submodule sync && git submodule update --init
+      - run:
+          name: Build
+          command: TRIPLE=x86_64-unknown-linux-gnu .circleci/build.sh
+      - run:
+          name: Run benchmarks
+          command: ./build/bm
+      - run:
+          name: Copy artifacts
+          command: mkdir /artifacts && mv ./build/bm /artifacts
+      - store_artifacts:
+          destination: ""
+          path: /artifacts
+
+
+  clang-x86:
+    docker:
+      - image: *build-image
+    steps:
+      - checkout
+      - run: git submodule sync && git submodule update --init
+      - run:
+          name: Build
+          command: TRIPLE=x86_64-unknown-linux-gnu USE_CLANG=1 .circleci/build.sh
+      - run:
+          name: Run benchmarks
+          command: ./build/bm
+      - run:
+          name: Copy artifacts
+          command: mkdir /artifacts && mv ./build/bm /artifacts
+      - store_artifacts:
+          destination: ""
+          path: /artifacts
+
+  gcc-arm:
+    docker:
+      - image: *build-image
+    steps:
+      - checkout
+      - run: git submodule sync && git submodule update --init
+      - run:
+          name: Build
+          command: TRIPLE=armv8-rpi3-linux-gnueabihf .circleci/build.sh
+      - run:
+          name: Check executable
+          command: file ./build/bm
+      - run:
+          name: Copy artifacts
+          command: mkdir /artifacts && mv ./build/bm /artifacts
+      - store_artifacts:
+          destination: ""
+          path: /artifacts
+
+  clang-arm:
+    docker:
+      - image: *build-image
+    steps:
+      - checkout
+      - run: git submodule sync && git submodule update --init
+      - run:
+          name: Build
+          command: TRIPLE=armv8-rpi3-linux-gnueabihf USE_CLANG=1 .circleci/build.sh
+      - run:
+          name: Check executable
+          command: file ./build/bm
+      - run:
+          name: Copy artifacts
+          command: mkdir /artifacts && mv ./build/bm /artifacts
+      - store_artifacts:
+          destination: ""
+          path: /artifacts
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - gcc-x86
+      - clang-x86
+      - gcc-arm
+      - clang-arm

@@ -18,6 +18,24 @@ using both `gcc` and `clang`.
 This is a good test of linear algebra performance using Eigen, as it requires
 matrix multiplication and inversion.
 
+## Example output
+
+```
+------------------------------------------------------------------------------------
+Benchmark                                          Time             CPU   Iterations
+------------------------------------------------------------------------------------
+CovarianceUpdateEigen<8>/8                       521 ns          521 ns      1302871
+CovarianceUpdateEigen<Eigen::Dynamic>/8         1044 ns         1044 ns       667531
+CovarianceUpdateEigen<16>/16                    2730 ns         2730 ns       256067
+CovarianceUpdateEigen<Eigen::Dynamic>/16        3290 ns         3290 ns       212534
+CovarianceUpdateEigen<32>/32                   14043 ns        14043 ns        49898
+CovarianceUpdateEigen<Eigen::Dynamic>/32       14437 ns        14437 ns        47832
+CovarianceUpdateEigen<64>/64                   84303 ns        84295 ns         8296
+CovarianceUpdateEigen<Eigen::Dynamic>/64       83483 ns        83484 ns         8287
+CovarianceUpdateEigen<128>/128                583930 ns       583847 ns         1190
+CovarianceUpdateEigen<Eigen::Dynamic>/128     570391 ns       570390 ns         1211
+```
+
 ## Running
 
 ```

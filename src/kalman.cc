@@ -1,76 +1,72 @@
+#include <benchmark/benchmark.h>
 #include <Eigen/Dense>
-#include <sltbench/Bench.h>
 
 #include <algorithm>
 #include <iostream>
 #include <vector>
 
-struct KalmanStuff {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+template <int CStateSize, int CObsSize = 3, typename NumType = double>
+static void CovarianceUpdateEigen(benchmark::State &state) {
+  using Eigen::Dynamic;
+  using Eigen::Matrix;
 
-    Eigen::MatrixXd P_x; // covariance matrix
-    Eigen::Matrix3Xd H_dx; // observation model
-    Eigen::Matrix3d R_meas; // measurement noise
+  if (CStateSize != Dynamic && CStateSize != state.range(0)) {
+    throw std::runtime_error("Compile time state size doesn't match runtime");
+  }
 
-    // scratch space for computations
-    Eigen::MatrixX3d K_gain;
-    Eigen::Matrix3d S_res;
-    Eigen::MatrixXd I_KH;
-    Eigen::MatrixXd P_x_ref;
-};
+  const int stateSize = state.range(0);
+  const int obsSize = CObsSize;
 
-class KalmanFixture {
-public:
-    using Type = KalmanStuff;
+  Matrix<NumType, CStateSize, CStateSize> P_x;  // covariance matrix
+  // Random symmetric matrix for the initial covariance.
+  P_x = Matrix<NumType, Dynamic, Dynamic>::Random(stateSize, stateSize);
+  P_x = (P_x.transpose() * P_x).eval();
 
-    KalmanFixture() {
-    }
+  Matrix<NumType, CObsSize, CStateSize> H_dx;  // observation model
+  // Observation model.
+  H_dx = Matrix<NumType, Dynamic, Dynamic>::Zero(obsSize, stateSize);
 
-    Type& SetUp(const long int& stateSize) {
-        // Only need to re-initialize the matrices if the state size has
-        // changed.
-        if (_stuff.P_x.rows() != stateSize) {
-            // Random symmetric matrix for the initial covariance.
-            _stuff.P_x = Eigen::MatrixXd::Random(stateSize, stateSize);
-            _stuff.P_x = (_stuff.P_x.transpose() * _stuff.P_x).eval();
+  Matrix<NumType, CObsSize, CObsSize> R_meas;  // measurement noise
+  // Random symmetric matrix for measurement noise.
+  R_meas = Matrix<NumType, Dynamic, Dynamic>::Random(obsSize, obsSize);
+  R_meas = (R_meas.transpose() * R_meas).eval();
 
-            // Observation model.
-            _stuff.H_dx = Eigen::Matrix3Xd::Zero(3, stateSize);
-            _stuff.H_dx.middleCols<3>(0) = Eigen::Matrix3d::Identity();
+  // scratch space for computations
+  Matrix<NumType, CStateSize, CObsSize> K_gain;
+  K_gain.resize(stateSize, obsSize);
+  Matrix<NumType, CObsSize, CObsSize> S_res;
+  S_res.resize(obsSize, obsSize);
+  Matrix<NumType, CStateSize, CStateSize> I_KH;
+  I_KH.resize(stateSize, stateSize);
+  Matrix<NumType, CStateSize, CStateSize> P_x_ref;
+  P_x_ref.resize(stateSize, stateSize);
 
-            // Random symmetric matrix for measurement noise.
-            _stuff.R_meas = Eigen::Matrix3d::Random();
-            _stuff.R_meas = (_stuff.R_meas.transpose() * _stuff.R_meas).eval();
+  for (auto _ : state) {
+    S_res = H_dx * P_x * H_dx.transpose() + R_meas;
+    K_gain = P_x * H_dx.transpose() * S_res.inverse();
 
-            _stuff.K_gain.resize(stateSize, 3);
-            _stuff.I_KH.resize(stateSize, stateSize);
-            _stuff.P_x_ref.resize(stateSize, stateSize);            
-        }
+    I_KH = Matrix<NumType, CStateSize, CStateSize>::Identity(stateSize,
+                                                             stateSize) -
+           K_gain * H_dx;
 
-        return _stuff;
-    }
+    P_x_ref = I_KH * P_x * I_KH.transpose();
+    P_x_ref += K_gain * R_meas * K_gain.transpose();
 
-    void TearDown() {}
-private:
-    Type _stuff;
-};
-
-void KalmanCovarianceUpdate(KalmanFixture::Type& state, const long int & stateSize) {
-    state.S_res = state.H_dx * state.P_x * state.H_dx.transpose() + state.R_meas;
-    state.K_gain = state.P_x * state.H_dx.transpose() * state.S_res.inverse();
-
-    state.I_KH =
-        Eigen::MatrixXd::Identity(stateSize, stateSize)
-        - state.K_gain * state.H_dx;
-
-    state.P_x_ref = state.I_KH * state.P_x * state.I_KH.transpose();
-    state.P_x_ref += state.K_gain * state.R_meas * state.K_gain.transpose();
-
-    sltbench::DoNotOptimize(state.P_x_ref);
+    benchmark::DoNotOptimize(P_x_ref);
+    benchmark::ClobberMemory();
+  }
 }
 
-static const std::vector<long int> stateSizes = { 100, 200, 400 };
+#define GENERATE_EIGEN_DYNAMIC_AND_STATIC_FOR_SIZE(n)   \
+  BENCHMARK_TEMPLATE(CovarianceUpdateEigen, n)->Arg(n); \
+  BENCHMARK_TEMPLATE(CovarianceUpdateEigen, Eigen::Dynamic)->Arg(n);
 
-SLTBENCH_FUNCTION_WITH_FIXTURE_AND_ARGS(KalmanCovarianceUpdate, KalmanFixture, stateSizes);
+GENERATE_EIGEN_DYNAMIC_AND_STATIC_FOR_SIZE(8);
+GENERATE_EIGEN_DYNAMIC_AND_STATIC_FOR_SIZE(16);
+GENERATE_EIGEN_DYNAMIC_AND_STATIC_FOR_SIZE(32);
+GENERATE_EIGEN_DYNAMIC_AND_STATIC_FOR_SIZE(64);
+GENERATE_EIGEN_DYNAMIC_AND_STATIC_FOR_SIZE(128);
 
-SLTBENCH_MAIN();
+#undef GENERATE_EIGEN_DYNAMIC_STATIC_FOR_SIZE
+
+BENCHMARK_MAIN();
